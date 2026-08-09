@@ -1,0 +1,17 @@
+version: "3.8"
+services:
+  api_gateway:
+    build: .
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+
+  db:
+    image: pgvector/pgvector:pg15
+    environment:
+      POSTGERS_USER: admin
+      POSTGERS_PASSWORD: root
+      POSTGRES_DB: smartbank
+    ports:
+      -"5432: 5432"

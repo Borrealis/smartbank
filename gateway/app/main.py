@@ -1,14 +1,23 @@
 import uuid
+from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import local_session
-from app.models import TaskRecord
+from app.database import engine, local_session
+from app.models import Base, TaskRecord
 
-app = FastAPI(title="SmartBank API GateWay")
+
+@asynccontextmanager
+async def lifespawn(app: FastAPI):
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    yield
+
+
+app = FastAPI(title="SmartBank API GateWay", lifespawn=lifespawn)
 
 
 @app.get("/")
@@ -41,4 +50,9 @@ async def get_task_status(task_id: str, db: AsyncSession = Depends(get_db)):
     task = result.scalar_one_or_none()
     if task is None:
         raise HTTPException(status_code=404, detail="Not found")
-    return {"task_id": task.task_id, "status": task.status, "query": task.query}
+    return {
+        "task_id": task.task_id,
+        "status": task.status,
+        "query": task.query,
+        "result": task.result,
+    }
