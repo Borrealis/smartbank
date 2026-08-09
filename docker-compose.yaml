@@ -14,4 +14,4 @@ services:
       POSTGERS_PASSWORD: root
       POSTGRES_DB: smartbank
     ports:
-      -"5432: 5432"
+      - "5432: 5432"
