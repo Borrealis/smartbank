@@ -8,8 +8,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 # Копируем только файлы с зависимостями и устанавливаем
 COPY pyproject.toml uv.lock* ./
-RUN uv sync --frozen --no-dev --no-install-projec
+RUN uv sync --frozen --no-dev --no-install-project
+# 1. НОВОЕ: Копируем настройки Алембика в корень рабочей папки Докера
+COPY gateway/alembic.ini ./
+# 2. НОВОЕ: Копируем саму папку со сгенерированными миграциями
+COPY gateway/alembic/ ./alembic/
 # Копируем код приложения
 COPY gateway/app/ ./app/
 EXPOSE 8000
-CMD ["/app/.venv/bin/uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000
