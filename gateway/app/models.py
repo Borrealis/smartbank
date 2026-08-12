@@ -1,5 +1,8 @@
+import uuid
+
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import Column, ForeignKey, Integer, String, Text
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import declarative_base
 
 Base = declarative_base()
@@ -7,7 +10,7 @@ Base = declarative_base()
 
 class TaskRecord(Base):
     __tablename__ = "tasks"
-    task_id = Column(String, primary_key=True)
+    task_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     query = Column(String)
     status = Column(String)
     result = Column(String, nullable=True)

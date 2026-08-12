@@ -15,21 +15,30 @@ class AskRequest(BaseModel):
     query: str
 
 
+class TaskResponse(BaseModel):
+    query: str
+    status: str
+
+
 async def get_db():
     async with local_session() as session:
-        yield session
+        try:
+            yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
 
 
-@router.post("/ask")
+@router.post("/ask", response_model=TaskResponse)
 async def ask_question(requests: AskRequest, db: AsyncSession = Depends(get_db)):
     task_id = str(uuid.uuid4())
     new_task = TaskRecord(task_id=task_id, query=requests.query, status="PENDING")
     db.add(new_task)
-    await db.commit()
     return {"task_id": task_id, "status": "PENDING"}
 
 
-@router.get("/status/{task_id}")
+@router.get("/status/{task_id}", response_model=TaskRecord)
 async def get_task_status(task_id: str, db: AsyncSession = Depends(get_db)):
     query = select(TaskRecord).where(TaskRecord.task_id == task_id)
     result = await db.execute(query)
