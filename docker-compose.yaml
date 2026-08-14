@@ -1,16 +1,32 @@
 services:
+  # [01] Сервис веб-шлюза
   api_gateway:
     build: .
     ports:
       - "8000:8000"
+    # TODO 1: Добавить директиву env_file со ссылкой на .env
     depends_on:
-      - db
+      db:
+        condition: service_healthy
 
+  # [02] Сервис базы данных PostgreSQL
   db:
     image: pgvector/pgvector:pg15
     environment:
+      # TODO 2: Заменить строковые значения на ${POSTGRES_USER}, ${POSTGRES_PASSWORD}, ${POSTGRES_DB}
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: root
       POSTGRES_DB: smartbank
     ports:
       - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+# [03] Корневой блок томов (без отступов от левого края)
+volumes:
+  postgres_data:
