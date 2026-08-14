@@ -8,12 +8,12 @@ class AskRequest(BaseModel):
 
 
 class AskResponse(BaseModel):
-    task_id: UUID = Field(..., description="uqique task identifier")
+    task_id: UUID = Field(..., description="Unique task identifier")
     status: str = Field(..., description="Current task status")
 
 
 class TaskStatusResponse(BaseModel):
-    task_id: UUID = Field(..., description="uqique task identifier")
+    task_id: UUID = Field(..., description="Unique task identifier")
     status: str = Field(..., description="Current task status")
     result: str | None = Field(None, description="Task result(if task is ready)")
     model_config = ConfigDict(from_attributes=True)
