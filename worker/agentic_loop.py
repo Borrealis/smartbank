@@ -25,14 +25,14 @@ TOOL_REGISTRY: Dict[str, ToolDefinition] = {
 
 
 def process_agent_step(tool_name: str, raw_arguments: str):
-    tool = json.loads(tool_name)
+    tool = TOOL_REGISTRY.get(tool_name)
     if not tool:
         return f"system error: Tool'{tool_name}' not found"
 
     try:
         parsed_args = json.loads(raw_arguments) if isinstance(raw_arguments, str) else raw_arguments
         validated_args = tool.schema.model_validate(parsed_args)
-        kwargs = validated_args.model_dunp()
+        kwargs = validated_args.model_dump()
         result = tool.handler(**kwargs)
         return str(result)
     except json.JSONDecodeError:
