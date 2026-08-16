@@ -5,7 +5,7 @@ from typing import Any, Callable, Dict, Type
 from pydantic import BaseModel, ValidationError
 
 from .schemas import ClientTariffInfo, SearchComplianceTool
-from .tools import get_client_tariff_info
+from .tools import get_client_tariff_info, search_compliance_knowledge
 
 
 @dataclass(frozen=True)
@@ -19,12 +19,12 @@ TOOL_REGISTRY: Dict[str, ToolDefinition] = {
         schema=ClientTariffInfo, handler=get_client_tariff_info
     ),
     "search_compliance_knowledge": ToolDefinition(
-        schema=SearchComplianceTool, handler=get_client_tariff_info
+        schema=SearchComplianceTool, handler=search_compliance_knowledge
     ),
 }
 
 
-def process_agent_step(tool_name: str, raw_arguments: str):
+async def process_agent_step(tool_name: str, raw_arguments: str):
     tool = TOOL_REGISTRY.get(tool_name)
     if not tool:
         return f"system error: Tool'{tool_name}' not found"

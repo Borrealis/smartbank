@@ -20,7 +20,7 @@ class ClientTariffInfo(BaseModel):
     client_id: str = Field(
         min_length=8,
         max_length=14,
-        description="Unique clinet identifier for example: client_abc",
+        description="Unique client identifier for example: client_abc",
     )
 
 
