@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     postgres_server: str = "localhost"
     postgres_port: int = 5432
     postgres_db: str = "smartbank"
+    kafka_host: str = "localhost:9092"
 
     @property
     def database_url(self) -> str:
