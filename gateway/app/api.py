@@ -1,5 +1,6 @@
 from uuid import UUID, uuid4
 
+from broker import kafka_router
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,6 +17,9 @@ async def ask_question(requests: AskRequest, db: AsyncSession = Depends(get_db))
     task_id = uuid4()
     new_task = TaskRecord(task_id=task_id, query=requests.query, status="PENDING")
     db.add(new_task)
+    await kafka_router.broker.publish(
+        {"task_id": str(task_id), "query": requests.query}, "gateway-requests"
+    )
     return {"task_id": task_id, "status": "PENDING"}
 
 
