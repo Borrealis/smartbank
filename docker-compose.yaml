@@ -1,21 +1,25 @@
 services:
   # [01] Сервис веб-шлюза
   api_gateway:
-    build: .
+    build:
+      context: .
+      dockerfile: gateway/Dockerfile
     ports:
       - "8000:8000"
-    # TODO 1: Добавить директиву env_file со ссылкой на .env
+
     depends_on:
       db:
         condition: service_healthy
+    env_file:
+      - .env
 
   # [02] Сервис базы данных PostgreSQL
   db:
     image: pgvector/pgvector:pg15
     environment:
-      # TODO 2: Заменить строковые значения на ${POSTGRES_USER}, ${POSTGRES_PASSWORD}, ${POSTGRES_DB}
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: root
+
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: smartbank
     ports:
       - "5433:5432"
@@ -26,6 +30,31 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+  kafka:
+    image: apache/kafka:latest
+    container_name: kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: 'broker,controller'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT'
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka:29093'
+      KAFKA_LISTENERS: 'PLAINTEXT://:29092,CONTROLLER://:29093,PLAINTEXT_HOST://:9092'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092'
+      KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
+      KAFKA_LOG_DIRS: '/tmp/kraft-combined-logs'
+      CLUSTER_ID: 'MkU3OEVBNTcwNTJENDM2Qk'
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
 
 # [03] Корневой блок томов (без отступов от левого края)
 volumes:
