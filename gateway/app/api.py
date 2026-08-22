@@ -1,10 +1,10 @@
 from uuid import UUID, uuid4
 
-from broker import kafka_router
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .broker import kafka_router
 from .database import get_db
 from .models import TaskRecord
 from .schemas import AskRequest, AskResponse, TaskStatusResponse
