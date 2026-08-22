@@ -1,0 +1,20 @@
+FROM python:3.12-slim
+WORKDIR /app
+# Системные зависимости для llama-cpp-python (компилятор и OpenBLAS)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+# Установка uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+# Копируем только файлы с зависимостями и устанавливаем
+COPY pyproject.toml uv.lock* ./
+RUN uv sync --frozen --no-dev --no-install-project
+# 1. НОВОЕ: Копируем настройки Алембика в корень рабочей папки Докера
+COPY gateway/alembic.ini ./
+# 2. НОВОЕ: Копируем саму папку со сгенерированными миграциями
+COPY gateway/alembic/ ./alembic/
+# Копируем код приложения
+COPY gateway/app/ ./app/
+EXPOSE 8000
+ENV PATH="/app/.venv/bin:$PATH"
+CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
