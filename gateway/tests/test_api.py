@@ -45,3 +45,13 @@ def test_get_status_not_found():
     assert response.status_code == 404
     task_data = response.json()
     assert "detail" in task_data
+
+    # def test_get_status_not_found():
+
+
+#     fake_id = uuid4()
+
+#     response = client.get(f"/status/{fake_id}")
+#     assert response.status_code == 404
+#     task_data = response.json()
+#     assert "detail" in task_data
