@@ -20,10 +20,13 @@ class WorkerResponses(BaseModel):
 async def get_task_info(m: WorkerResponses, db: AsyncSession = Depends(get_db)):
     query = select(TaskRecord).where(TaskRecord.task_id == m.task_id)
     result_db = await db.execute(query)
+    result = m.result
     task = result_db.scalar_one_or_none()
+    status = m.status
 
     if task is None:
         return
 
-    task.status = m.status  # type: ignore
-    task.result = m.result  # type: ignore
+    task.status = status
+    task.result = result
+    await db.commit()

@@ -1,40 +1,46 @@
 import uuid
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import Column, ForeignKey, Integer, String, Text
+from sqlalchemy import ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import declarative_base
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
-Base = declarative_base()
+
+class Base(DeclarativeBase):
+    pass
 
 
 class TaskRecord(Base):
     __tablename__ = "tasks"
-    task_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    query = Column(String)
-    status = Column(String)
-    result = Column(String, nullable=True)
+    task_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    query: Mapped[str] = mapped_column(String)
+    status: Mapped[str] = mapped_column(String)
+    result: Mapped[str | None] = mapped_column(String, nullable=True)
 
 
 class Documents(Base):
     __tablename__ = "documents"
-    id = Column(String, primary_key=True)
-    title = Column(String)
-    product_category = Column(String)
-    source_url = Column(String, nullable=True)
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    title: Mapped[str] = mapped_column(String)
+    product_category: Mapped[str] = mapped_column(String)
+    source_url: Mapped[str | None] = mapped_column(String, nullable=True)
 
 
 class DocumentsChunk(Base):
     __tablename__ = "document_chunks"
-    id = Column(String, primary_key=True)
-    document_id = Column(String, ForeignKey("documents.id"))
-    text_content = Column(Text)
-    embedding = Column(Vector(1536))
-    chunk_index = Column(Integer)
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    document_id: Mapped[str] = mapped_column(String, ForeignKey("documents.id"))
+    text_content: Mapped[str] = mapped_column(Text)
+    embedding: Mapped[list[float]] = mapped_column(Vector(1536))
+    chunk_index: Mapped[int] = mapped_column()
 
 
 class Client(Base):
     __tablename__ = "clients"
-    id = Column(String, primary_key=True)
-    status = Column(String)
-    tariff_plan = Column(String)
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    status: Mapped[str] = mapped_column(String)
+    tariff_plan: Mapped[str] = mapped_column(String)
