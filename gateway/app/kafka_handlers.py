@@ -26,7 +26,7 @@ async def get_task_info(m: WorkerResponses, db: AsyncSession = Depends(get_db)):
 
     if task is None:
         return
-
+    # add finish acynco call
     task.status = status
     task.result = result
     await db.commit()
