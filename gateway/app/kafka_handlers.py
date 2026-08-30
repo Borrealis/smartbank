@@ -18,7 +18,7 @@ class WorkerResponse(BaseModel):
     result: WorkerResultPayload | None = Field(None, description="Task result(if task is ready")
 
 
-@kafka_router.subscriber("worker-responses")
+@kafka_router.subscriber("worker-response")
 async def get_task_info(m: WorkerResponse, db: AsyncSession = Depends(get_db)):
     try:
         query = select(TaskRecord).where(TaskRecord.task_id == m.task_id)
