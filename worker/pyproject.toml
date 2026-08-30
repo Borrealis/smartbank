@@ -1,0 +1,18 @@
+[project]
+name = "worker"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic",
+    "python-dotenv",
+    "openai",
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
