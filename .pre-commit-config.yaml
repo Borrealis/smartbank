@@ -12,3 +12,10 @@ repos:
       - id: ruff
         args: [--fix]
       - id: ruff-format
+  - repo: local
+    hooks:
+      - id: no-commented-code-blocks
+        name: Check for >2 consecutive commented lines
+        entry: python scripts/check_code.py
+        language: python
+        files: \.py$
