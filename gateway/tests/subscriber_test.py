@@ -1,9 +1,8 @@
-import json
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
-from app.kafka_handlers import WorkerResponses, get_task_info
+from app.kafka_handlers import WorkerResponse, get_task_info
 from app.models import TaskRecord
 
 
@@ -11,15 +10,15 @@ from app.models import TaskRecord
 async def test_get_task_info_subscriber():
     db_mock = AsyncMock()
     shared_task_id = uuid4()
-
     mock_task = TaskRecord(
         task_id=shared_task_id, query="test query", status="PENDING", result=None
     )
+    task_result_dict = {"answer": "test answer"}
 
-    test_result_str = json.dumps({"data": "ok"})
-
-    test_message = WorkerResponses(
-        task_id=shared_task_id, status="COMPLETED", result=test_result_str
+    test_message = WorkerResponse(
+        task_id=shared_task_id,
+        status="COMPLETED",
+        result=task_result_dict,  # type: ignore
     )
 
     # Правильная настройка цепочки возврата
@@ -30,4 +29,4 @@ async def test_get_task_info_subscriber():
     await get_task_info(m=test_message, db=db_mock)
 
     assert mock_task.status == "COMPLETED"
-    assert mock_task.result == test_result_str
+    assert mock_task.result == {"answer": "test answer", "sources": [], "confidence": None}

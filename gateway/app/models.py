@@ -1,7 +1,8 @@
 import uuid
+from typing import Any
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import ForeignKey, String, Text
+from sqlalchemy import JSON, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -17,7 +18,7 @@ class TaskRecord(Base):
     )
     query: Mapped[str] = mapped_column(String)
     status: Mapped[str] = mapped_column(String)
-    result: Mapped[str | None] = mapped_column(String, nullable=True)
+    result: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
 
 
 class Documents(Base):

@@ -1,3 +1,4 @@
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -12,8 +13,18 @@ class AskResponse(BaseModel):
     status: str = Field(..., description="Current task status")
 
 
+class WorkerResultPayload(BaseModel):
+    answer: str = Field(..., description="Generated answe text")
+    sources: list[str] = Field(
+        default_factory=list, description=" List of source document Ids or links"
+    )
+    confidence: float | None = Field(default=None, description="Optional score or metadata")
+
+
 class TaskStatusResponse(BaseModel):
     task_id: UUID = Field(..., description="Unique task identifier")
     status: str = Field(..., description="Current task status")
-    result: str | None = Field(None, description="Task result(if task is ready)")
     model_config = ConfigDict(from_attributes=True)
+    result: WorkerResultPayload | dict[str, Any] | None = Field(
+        default=None, description="Structured task result"
+    )

@@ -12,14 +12,24 @@ from .schemas import AskRequest, AskResponse, TaskStatusResponse
 router = APIRouter()
 
 
+@kafka_router.publisher("gateway-request")
+async def publish_ask_request(message: dict):
+    """Function send message in topic/ FastStream serialization dict to JSON"""
+    return message
+
+
 @router.post("/ask", response_model=AskResponse)
 async def ask_question(requests: AskRequest, db: AsyncSession = Depends(get_db)):
     task_id = uuid4()
     new_task = TaskRecord(task_id=task_id, query=requests.query, status="PENDING")
     db.add(new_task)
-    await kafka_router.broker.publish(
-        {"task_id": str(task_id), "query": requests.query}, "gateway-requests"
-    )
+    try:
+        await publish_ask_request({"task_id": str(task_id), "query": requests.query})
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(
+            status_code=503, detail="Service temporaly not awailable now. Task not send in worker "
+        ) from e
     return {"task_id": task_id, "status": "PENDING"}
 
 
