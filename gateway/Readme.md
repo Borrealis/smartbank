@@ -1,107 +1,388 @@
 # SmartBank API Gateway
 
-API-шлюз для проекта SmartBank. Сервис выступает единой точкой входа для клиентских запросов: он принимает HTTP-запросы, сохраняет их состояние в базу данных и маршрутизирует в брокер сообщений Kafka для дальнейшей асинхронной обработки RAG-воркерами (или другими микросервисами).
+API-шлюз для проекта **SmartBank**. Сервис выступает единой точкой входа для клиентских запросов: принимает HTTP-запросы, сохраняет состояние задач в PostgreSQL и маршрутизирует задачи в Kafka для дальнейшей асинхронной обработки RAG-воркерами и другими микросервисами.
 
-## Как это работает (Функционал)
-1. Клиент отправляет вопрос через `POST /ask`.
-2. Шлюз генерирует уникальный `task_id`, сохраняет задачу в PostgreSQL со статусом `PENDING` и отправляет сообщение в Kafka (топик `gateway-requests`).
-3. Клиент получает `task_id` и может проверять готовность через `GET /status/{task_id}`.
-4. Фоновый процесс шлюза (через FastStream) слушает топик Kafka `worker-responses`.
-5. Когда сторонний воркер обрабатывает запрос и присылает ответ в этот топик, шлюз перехватывает сообщение и обновляет статус и результат задачи в базе данных (например, на `COMPLETED`).
+---
 
-## Стек технологий
-- **Фреймворк:** FastAPI
-- **База данных:** PostgreSQL, SQLAlchemy (async), pgvector, Alembic (миграции)
-- **Брокер сообщений:** Kafka, FastStream
-- **Валидация:** Pydantic
+## Содержание
 
-## Структура проекта
+- [Архитектура и принцип работы](#архитектура-и-принцип-работы)
+- [Стек технологий](#стек-технологий)
+- [Структура проекта](#структура-проекта)
+- [Установка и подготовка окружения](#установка-и-подготовка-окружения)
+- [Конфигурация](#конфигурация)
+- [Миграции базы данных](#миграции-базы-данных)
+- [Запуск приложения](#запуск-приложения)
+- [Тестирование и качество кода](#тестирование-и-качество-кода)
+- [API](#api)
+- [Статусы задач](#статусы-задач)
+
+---
+
+## Архитектура и принцип работы
+
+Основной сценарий работы шлюза построен вокруг асинхронной обработки задач через Kafka.
+
 ```text
-gateway/
-├── alembic/               # Инфраструктура для миграций базы данных
-│   ├── versions/          # Сгенерированные файлы миграций
-│   ├── env.py
-│   ├── README
-│   └── script.py.mako
-├── app/                   # Основной код приложения
-│   ├── __init__.py
-│   ├── api.py             # HTTP роутеры (FastAPI)
-│   ├── broker.py          # Инициализация и настройка Kafka-брокера
-│   ├── config.py          # Настройки приложения и переменные окружения
-│   ├── database.py        # Подключение к PostgreSQL и управление сессиями
-│   ├── kafka_handlers.py  # Обработчики входящих сообщений из Kafka
-│   ├── main.py            # Точка входа, сборка приложения
-│   ├── models.py          # Декларативные модели SQLAlchemy
-│   └── schemas.py         # Pydantic-схемы для валидации данных
-├── tests/                 # Автотесты (pytest)
-│   ├── conftest.py        # Общие фикстуры
-│   ├── subscriber_test.py
-│   ├── test_api.py
-│   └── test_schemas.py
-├── alembic.ini            # Главный конфигурационный файл Alembic
-├── docker-compose.yml     # Конфигурация для запуска инфраструктуры
-└── Dockerfile             # Инструкции для сборки Docker-образа
+┌──────────┐
+│  Client  │
+└────┬─────┘
+     │
+     │ POST /ask
+     ▼
+┌─────────────────────┐
+│  SmartBank Gateway  │
+│      FastAPI        │
+└────┬───────────┬────┘
+     │           │
+     │           │ сохраняет задачу
+     │           ▼
+     │      ┌──────────────┐
+     │      │  PostgreSQL  │
+     │      └──────────────┘
+     │
+     │ публикует task
+     ▼
+┌─────────────────────┐
+│        Kafka        │
+│  gateway-requests   │
+└─────────┬───────────┘
+          │
+          ▼
+   ┌───────────────┐
+   │  RAG Worker   │
+   └───────┬───────┘
+           │
+           │ результат
+           ▼
+┌─────────────────────┐
+│        Kafka        │
+│  worker-responses   │
+└─────────┬───────────┘
+          │
+          ▼
+┌─────────────────────┐
+│  SmartBank Gateway  │
+│  FastStream Handler │
+└─────────┬───────────┘
+          │
+          │ обновление задачи
+          ▼
+   ┌──────────────┐
+   │  PostgreSQL  │
+   └──────────────┘
 ```
 
+### Последовательность обработки
+
+1. Клиент отправляет вопрос через `POST /ask`.
+2. Gateway генерирует уникальный `task_id` в формате UUID.
+3. Задача сохраняется в PostgreSQL со статусом `PENDING`.
+4. Gateway публикует сообщение в Kafka в топик `gateway-requests`.
+5. Клиент получает `task_id` и может проверять состояние задачи через `GET /status/{task_id}`.
+6. Фоновый Kafka-подписчик, реализованный через FastStream, слушает топик `worker-responses`.
+7. После получения результата от RAG-воркера Gateway обновляет задачу в PostgreSQL:
+   - устанавливает статус `COMPLETED`;
+   - сохраняет результат обработки.
+8. Клиент получает готовый ответ при следующем запросе статуса.
+
+---
+
+## Стек технологий
+
+| Категория | Технологии |
+|---|---|
+| Язык | Python 3.12+ |
+| Менеджер пакетов | `uv` |
+| Web-фреймворк | FastAPI |
+| База данных | PostgreSQL |
+| ORM | SQLAlchemy |
+| Async DB driver | asyncpg |
+| Миграции | Alembic |
+| Векторное расширение | pgvector |
+| Векторный тип | `Vector(1536)` |
+| Message Broker | Apache Kafka |
+| Kafka framework | FastStream |
+| Валидация | Pydantic v2 |
+| Конфигурация | Pydantic Settings |
+| Линтинг | Ruff |
+| Git hooks | pre-commit |
+| Тестирование | pytest |
+| Async-тесты | pytest-asyncio |
+| Контейнеризация | Docker / Docker Compose |
+
+---
+
+## Структура проекта
+
+```text
+gateway/
+│
+├── alembic/                         # Инфраструктура миграций БД
+│   ├── versions/                    # Файлы миграций
+│   ├── env.py                       # Конфигурация Alembic + SQLAlchemy
+│   ├── README
+│   └── script.py.mako
+│
+├── app/                             # Исходный код Gateway
+│   ├── __init__.py
+│   ├── api.py                       # HTTP-роутеры FastAPI
+│   ├── broker.py                    # Инициализация KafkaBroker / FastStream
+│   ├── config.py                    # Конфигурация и .env
+│   ├── database.py                  # Async Engine, connection pool, get_db()
+│   ├── kafka_handlers.py            # FastStream subscribers
+│   ├── main.py                      # ASGI-точка входа FastAPI
+│   ├── models.py                    # SQLAlchemy-модели
+│   └── schemas.py                   # Pydantic-схемы
+│
+├── scripts/
+│   └── check_code.py                # Проверка закомментированного кода
+│
+├── tests/                            # Автотесты
+│   ├── conftest.py                  # Фикстуры async-клиента и mock-объектов
+│   ├── subscriber_test.py           # Тесты FastStream handlers
+│   ├── test_api.py                  # Тесты HTTP endpoints
+│   └── test_schemas.py              # Тесты Pydantic-моделей
+│
+├── .env.example                     # Шаблон переменных окружения
+├── .pre-commit-config.yaml          # Конфигурация pre-commit
+├── alembic.ini                      # Конфигурация Alembic
+├── docker-compose.yml               # Gateway + PostgreSQL + Kafka + Kafka UI
+├── Dockerfile                       # Docker-образ Gateway
+└── pyproject.toml                   # Зависимости и настройки проекта
+```
+
+---
+
+## Установка и подготовка окружения
+
+### 1. Установить `uv`
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+Проверить установку:
+
+```bash
+uv --version
+```
+
+### 2. Перейти в директорию проекта
+
+```bash
+cd gateway
+```
+
+### 3. Установить зависимости
+
+`uv` создаст виртуальное окружение и установит зависимости из `pyproject.toml`.
+
+```bash
+uv sync
+```
+
+### 4. Установить Git hooks
+
+```bash
+uv run pre-commit install
+```
+
+---
+
 ## Конфигурация
-Для запуска проекта необходимо создать файл `.env` в корневой директории.
-Пример переменных (значения по умолчанию из `config.py`):
+
+Создайте файл `.env` в корне проекта `gateway/`.
+
+Пример:
+
 ```env
 POSTGRES_USER=admin
 POSTGRES_PASSWORD=root
 POSTGRES_SERVER=localhost
 POSTGRES_PORT=5432
 POSTGRES_DB=smartbank
+
 KAFKA_HOST=localhost:9092
 ```
 
+> **Важно:** реальные секреты и пароли не следует коммитить в Git. Для репозитория используйте `.env.example`.
+
+---
+
+## Настройки PostgreSQL Connection Pool
+
+Настройки пула подключений SQLAlchemy находятся в `app/database.py`.
+
+| Параметр | Значение | Назначение |
+|---|---:|---|
+| `pool_size` | `5` | Количество постоянных соединений |
+| `max_overflow` | `10` | Максимальное количество дополнительных соединений при нагрузке |
+| `pool_timeout` | `30` | Время ожидания свободного соединения, секунд |
+| `pool_recycle` | `1800` | Пересоздание соединений каждые 30 минут |
+| `pool_pre_ping` | `True` | Проверка соединения перед выдачей из пула |
+
+### `get_db()`
+
+`get_db()` — асинхронный генератор сессий SQLAlchemy.
+
+При успешном выполнении операции выполняется `commit`, при возникновении ошибки — `rollback`.
+
+---
+
+## Миграции базы данных
+
+Для работы с миграциями используется **Alembic**.
+
+### Применить все миграции
+
+```bash
+uv run alembic upgrade head
+```
+
+### Создать новую миграцию
+
+```bash
+uv run alembic revision --autogenerate -m "add_new_table"
+```
+
+После создания миграции рекомендуется проверить сгенерированный файл вручную перед применением.
+
+### Откатить последнюю миграцию
+
+```bash
+uv run alembic downgrade -1
+```
+
+---
+
 ## Запуск приложения
 
-### Запуск через Docker Compose (Рекомендуемый)
-Позволяет поднять микросервис в единой сети со всей необходимой инфраструктурой (PostgreSQL, Kafka).
+### Вариант 1 — Docker Compose
 
-Сборка и запуск контейнеров (флаг `-d` запустит их в фоновом режиме):
+Рекомендуемый способ запуска полного окружения.
+
 ```bash
-docker-compose up --build -d
+docker compose up --build -d
 ```
 
-Остановка контейнеров:
+Проверить запущенные контейнеры:
+
 ```bash
-docker-compose down
+docker compose ps
 ```
 
-### Локальный запуск (через Uvicorn)
-Из корня проекта выполните команду:
+### Просмотр логов Gateway
+
 ```bash
-uvicorn app.main:app --reload
+docker compose logs -f api_gateway
 ```
 
-## Запуск тестов
-В проекте настроены тесты для API, брокера и схем валидации (используется `pytest`).
+### Остановка контейнеров
 
-Запустить все тесты можно командой:
 ```bash
-pytest
+docker compose down
 ```
 
-Если нужно запустить тесты внутри уже запущенного Docker-контейнера шлюза (замените `gateway-app` на актуальное имя вашего контейнера):
+Если необходимо удалить также volumes:
+
 ```bash
-docker exec -it gateway-app pytest
+docker compose down -v
 ```
 
-## API Endpoints
+> Команда `down -v` удаляет данные из Docker volumes, включая данные PostgreSQL.
 
-### `POST /ask`
-Создает новую задачу на обработку запроса.
+---
 
-**Тело запроса:**
+### Вариант 2 — локальный запуск
+
+Если PostgreSQL и Kafka уже запущены локально:
+
+```bash
+uv run uvicorn app.main:app --reload --port 8000
+```
+
+После запуска API будет доступен на:
+
+```text
+http://localhost:8000
+```
+
+Swagger UI:
+
+```text
+http://localhost:8000/docs
+```
+
+ReDoc:
+
+```text
+http://localhost:8000/redoc
+```
+
+---
+
+## Тестирование и качество кода
+
+### Запуск всех тестов
+
+```bash
+uv run pytest -v
+```
+
+### Запуск тестов внутри Docker-контейнера
+
+```bash
+docker compose exec api_gateway pytest -v
+```
+
+### Запуск всех pre-commit hooks
+
+```bash
+uv run pre-commit run --all-files
+```
+
+### Проверка закомментированного кода
+
+```bash
+uv run pre-commit run no-commented-code-blocks --all-files
+```
+
+### Ruff: проверка и автоматическое исправление
+
+```bash
+uv run ruff check --fix .
+```
+
+### Ruff: форматирование
+
+```bash
+uv run ruff format .
+```
+
+---
+
+# API
+
+## `POST /ask`
+
+Создает новую задачу на обработку пользовательского вопроса.
+
+### Request
+
+```http
+POST /ask
+Content-Type: application/json
+```
+
 ```json
 {
-  "query": "How transfer money to IP without fee"
+  "query": "Как перевести деньги ИП без комиссии?"
 }
 ```
 
-**Успешный ответ (200 OK):**
+### Response — `200 OK`
+
 ```json
 {
   "task_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
@@ -109,10 +390,31 @@ docker exec -it gateway-app pytest
 }
 ```
 
-### `GET /status/{task_id}`
-Проверяет статус выполнения задачи.
+### Что происходит внутри
 
-**Успешный ответ, задача в процессе (200 OK):**
+После получения запроса Gateway:
+
+1. валидирует входные данные через Pydantic;
+2. генерирует `task_id`;
+3. создает запись задачи в PostgreSQL;
+4. устанавливает статус `PENDING`;
+5. отправляет задачу в Kafka topic `gateway-requests`;
+6. возвращает клиенту `task_id`.
+
+---
+
+## `GET /status/{task_id}`
+
+Возвращает текущий статус задачи и результат обработки.
+
+### Request
+
+```http
+GET /status/3fa85f64-5717-4562-b3fc-2c963f66afa6
+```
+
+### Response — задача в обработке
+
 ```json
 {
   "task_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
@@ -121,18 +423,117 @@ docker exec -it gateway-app pytest
 }
 ```
 
-**Успешный ответ, задача выполнена (200 OK):**
+### Response — задача завершена
+
 ```json
 {
   "task_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
   "status": "COMPLETED",
-  "result": "{\"data\": \"Перевод без комиссии возможен через СБП...\"}"
+  "result": {
+    "answer": "Перевод без комиссии возможен через Систему Быстрых Платежей в пределах лимита тарифа.",
+    "sources": [
+      "Памятка по тарифам и лимитам.md"
+    ],
+    "confidence": 0.95
+  }
 }
 ```
 
-**Ошибка, задача не найдена (404 Not Found):**
+### Response — задача не найдена
+
+**HTTP `404 Not Found`**
+
 ```json
 {
-  "detail": "Not found"
+  "detail": "Task not found"
 }
 ```
+
+---
+
+## Статусы задач
+
+На текущем этапе основной жизненный цикл задачи выглядит следующим образом:
+
+```text
+          ┌─────────┐
+          │ PENDING │
+          └────┬────┘
+               │
+               │ ответ от RAG Worker
+               ▼
+        ┌─────────────┐
+        │  COMPLETED  │
+        └─────────────┘
+```
+
+### `PENDING`
+
+Задача создана и ожидает или уже находится в процессе асинхронной обработки.
+
+### `COMPLETED`
+
+RAG-воркер завершил обработку. Результат сохранен в PostgreSQL и доступен через `GET /status/{task_id}`.
+
+---
+
+## Kafka
+
+Gateway использует два основных Kafka-топика.
+
+| Topic | Направление | Назначение |
+|---|---|---|
+| `gateway-requests` | Gateway → Worker | Передача новых задач на обработку |
+| `worker-responses` | Worker → Gateway | Получение результатов обработки |
+
+### Поток сообщений
+
+```text
+Gateway
+   │
+   │ task
+   ▼
+gateway-requests
+   │
+   ▼
+RAG Worker
+   │
+   │ result
+   ▼
+worker-responses
+   │
+   ▼
+Gateway
+   │
+   ▼
+PostgreSQL
+```
+
+Kafka используется для разделения синхронного HTTP API и асинхронной обработки задач.
+
+---
+
+## Разработка
+
+Перед созданием Pull Request рекомендуется выполнить:
+
+```bash
+uv run pytest -v
+uv run ruff check --fix .
+uv run ruff format .
+uv run pre-commit run --all-files
+```
+
+Также необходимо убедиться, что:
+
+- миграции Alembic применяются без ошибок;
+- новые изменения покрыты тестами;
+- секреты не добавлены в репозиторий;
+- `.env` не коммитится;
+- API-контракты и Pydantic-схемы синхронизированы с клиентом и воркерами.
+
+---
+
+## Лицензия
+
+Проект является внутренним компонентом SmartBank.
