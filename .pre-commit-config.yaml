@@ -12,10 +12,8 @@ repos:
       - id: ruff
         args: [--fix]
       - id: ruff-format
-  - repo: local
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v3.4.0
     hooks:
-      - id: no-commented-code-blocks
-        name: Check for >2 consecutive commented lines
-        entry: python scripts/check_code.py
-        language: python
-        files: \.py$
+      - id: conventional-pre-commit
+        stages: [commit-msg]
