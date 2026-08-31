@@ -1,36 +1,41 @@
-from uuid import UUID
-
 from fastapi import Depends
+from faststream.kafka.fastapi import KafkaRouter
 from loguru import logger
-from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .broker import kafka_router
+from .config import settings
 from .database import get_db
 from .models import TaskRecord
-from .schemas import WorkerResultPayload
+from .schemas import AskRequest, TaskStatusResponse, WorkerResultPayload
+
+kafka_router = KafkaRouter(settings.kafka_host)
 
 
-class WorkerResponse(BaseModel):
-    task_id: UUID = Field(..., description="Unique task identifier")
-    status: str = Field(..., description="Current task status")
-    result: WorkerResultPayload | None = Field(None, description="Task result(if task is ready")
+@kafka_router.publisher("gateway-request")
+async def publish_ask_request(msg: AskRequest) -> AskRequest:
+    """Публикация задачи в Kafka топик gateway-request."""
+    logger.info("Publishing task to Kafka: task_id={}", msg.task_id)
+    return msg
 
 
 @kafka_router.subscriber("worker-response")
-async def get_task_info(m: WorkerResponse, db: AsyncSession = Depends(get_db)):
+async def get_task_info(msg: TaskStatusResponse, db: AsyncSession = Depends(get_db)):
+    """Обработка ответа от воркера и обновление статуса задачи в БД."""
+    logger.info("Received worker response: task_id={}, status={}", msg.task_id, msg.status)
     try:
-        query = select(TaskRecord).where(TaskRecord.task_id == m.task_id)
+        query = select(TaskRecord).where(TaskRecord.task_id == msg.task_id)
         result_db = await db.execute(query)
         task = result_db.scalar_one_or_none()
 
         if task is None:
-            logger.error(f"Task with id {m.task_id} not found in database")
+            logger.warning("Task with id {} not found in database", msg.task_id)
             return
-        task.status = m.status
 
-        task.result = m.result.model_dump() if m.result is not None else None
-
+        task.status = msg.status
+        task.result = (
+            msg.result.model_dump() if isinstance(msg.result, WorkerResultPayload) else msg.result
+        )
+        logger.info("Task {} successfully updated in DB", msg.task_id)
     except Exception:
-        logger.exception(f"Failed to process task update for task_id={m.task_id}")
+        logger.exception("Failed to process task update for task_id={}", msg.task_id)

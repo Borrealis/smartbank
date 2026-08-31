@@ -1,36 +1,30 @@
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .broker import kafka_router
 from .database import get_db
+from .kafka_handlers import publish_ask_request
 from .models import TaskRecord
 from .schemas import AskRequest, AskResponse, TaskStatusResponse
 
 router = APIRouter()
 
 
-@kafka_router.publisher("gateway-request")
-async def publish_ask_request(message: dict):
-    """Function send message in topic/ FastStream serialization dict to JSON"""
-    return message
-
-
 @router.post("/ask", response_model=AskResponse)
 async def ask_question(requests: AskRequest, db: AsyncSession = Depends(get_db)):
-    task_id = uuid4()
+    task_id = requests.task_id
     new_task = TaskRecord(task_id=task_id, query=requests.query, status="PENDING")
     db.add(new_task)
     try:
-        await publish_ask_request({"task_id": str(task_id), "query": requests.query})
+        await publish_ask_request(requests)
     except Exception as e:
         await db.rollback()
         raise HTTPException(
             status_code=503, detail="Service temporaly not awailable now. Task not send in worker "
         ) from e
-    return {"task_id": task_id, "status": "PENDING"}
+    return {"task_id": requests.task_id, "status": "PENDING"}
 
 
 @router.get("/status/{task_id}", response_model=TaskStatusResponse)

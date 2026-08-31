@@ -263,7 +263,7 @@ uv run alembic downgrade -1
 Рекомендуемый способ запуска полного окружения.
 
 ```bash
-docker compose up --build -d
+docker compose up -d --build api_gateway
 ```
 
 Проверить запущенные контейнеры:

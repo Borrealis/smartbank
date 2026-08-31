@@ -1,10 +1,11 @@
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
 class AskRequest(BaseModel):
+    task_id: UUID | None = Field(default_factory=uuid4, description="Unique task identifier")
     query: str = Field(min_length=1, max_length=1000, description="Query text")
 
 
