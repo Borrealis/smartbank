@@ -6,6 +6,9 @@ dependencies = [
     "pydantic",
     "python-dotenv",
     "openai",
+    "faststream[cli,kafka]>=0.7.5",
+    "langchain-core>=1.6.1",
+    "langchain-text-splitters>=1.1.2",
 ]
 
 [dependency-groups]
