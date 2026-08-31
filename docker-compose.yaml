@@ -56,6 +56,6 @@ services:
       KAFKA_CLUSTERS_0_NAME: local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
 
-# [03] Корневой блок томов (без отступов от левого края)
+
 volumes:
   postgres_data:
