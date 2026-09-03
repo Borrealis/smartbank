@@ -4,8 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .broker import publish_ask_request
 from .database import get_db
-from .kafka_handlers import publish_ask_request
 from .models import TaskRecord
 from .schemas import AskRequest, AskResponse, TaskStatusResponse
 

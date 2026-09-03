@@ -36,6 +36,7 @@ async def get_task_info(msg: TaskStatusResponse, db: AsyncSession = Depends(get_
         task.result = (
             msg.result.model_dump() if isinstance(msg.result, WorkerResultPayload) else msg.result
         )
+        await db.commit()
         logger.info("Task {} successfully updated in DB", msg.task_id)
     except Exception:
         logger.exception("Failed to process task update for task_id={}", msg.task_id)

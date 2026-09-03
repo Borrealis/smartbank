@@ -2,8 +2,9 @@ from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
-from app.kafka_handlers import WorkerResponse, get_task_info
+from app.broker import get_task_info
 from app.models import TaskRecord
+from app.schemas import TaskStatusResponse
 
 
 @pytest.mark.asyncio
@@ -15,7 +16,7 @@ async def test_get_task_info_subscriber():
     )
     task_result_dict = {"answer": "test answer"}
 
-    test_message = WorkerResponse(
+    test_message = TaskStatusResponse(
         task_id=shared_task_id,
         status="COMPLETED",
         result=task_result_dict,  # type: ignore
@@ -26,7 +27,8 @@ async def test_get_task_info_subscriber():
     mock_result.scalar_one_or_none.return_value = mock_task
     db_mock.execute.return_value = mock_result
 
-    await get_task_info(m=test_message, db=db_mock)
+    await get_task_info(msg=test_message, db=db_mock)
 
     assert mock_task.status == "COMPLETED"
     assert mock_task.result == {"answer": "test answer", "sources": [], "confidence": None}
+    db_mock.commit.assert_awaited_once()

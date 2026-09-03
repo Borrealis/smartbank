@@ -1,7 +1,7 @@
 from uuid import uuid4
 
 import pytest
-from app.kafka_handlers import kafka_router
+from app.broker import kafka_router
 from app.main import app
 from fastapi.testclient import TestClient
 from faststream.kafka import TestKafkaBroker
