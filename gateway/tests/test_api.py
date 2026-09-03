@@ -1,7 +1,7 @@
 from uuid import uuid4
 
 import pytest
-from app.broker import kafka_router
+from app.kafka_handlers import kafka_router
 from app.main import app
 from fastapi.testclient import TestClient
 from faststream.kafka import TestKafkaBroker
@@ -11,11 +11,11 @@ client = TestClient(app)
 
 
 @pytest.mark.asyncio
-async def test_ask_question_kafak_rollback(override_db, monkeypatch):
-    async def falling_publish(message):
+async def test_ask_question_kafka_rollback(override_db, monkeypatch):
+    async def failing_publish(message):
         raise Exception("Kafka is down")
 
-    monkeypatch.setattr("app.api.publish_ask_request", falling_publish)
+    monkeypatch.setattr("app.api.publish_ask_request", failing_publish)
     payload = {"query": "test_query"}
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         response = await ac.post("/ask", json=payload)
@@ -25,7 +25,7 @@ async def test_ask_question_kafak_rollback(override_db, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_ask_question(override_db):
-    payload = {"query": "How transfer money to IP  without fee"}
+    payload = {"query": "How transfer money to IP without fee"}
     async with TestKafkaBroker(kafka_router.broker):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
             response = await ac.post("/ask", json=payload)
