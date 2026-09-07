@@ -1,68 +1,39 @@
-import asyncio
-import json
 import os
 from typing import Any, Dict
 
 from dotenv import load_dotenv
-from openai import AsyncOpenAI
+from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
+from langchain_google_genai import ChatGoogleGenerativeAI
 
-from .agentic_loop import process_agent_step
-from .tools import tools
+from worker.tools import get_client_tariff_info, search_compliance_knowledge
 
 load_dotenv()
 
+tools = [get_client_tariff_info, search_compliance_knowledge]
+tools_by_name = {tool.name: tool for tool in tools}
 
-# Инициализируем клиент, перенаправляя его на серверы Google
-client = AsyncOpenAI(
-    api_key=os.getenv("GEMINI_API_KEY"),
-    base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
-)
+
+llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=os.getenv("GEMINI_API_KEY"))
+llm_get_tools = llm.bind_tools(tools)
 
 
 async def run_agentic_loop(user_query: str, max_iterations: int = 15) -> Dict[str, Any]:
-    """Асинхронный конечный автомат для управления агентом."""
-
     messages: list = [
-        {"role": "system", "content": "You are AI assistant in bank"},
-        {"role": "user", "content": user_query},
+        SystemMessage(content="You are AI assistant in bank"),
+        HumanMessage(content=user_query),
     ]
+
     for iteration in range(max_iterations):
-        raw_response = await client.chat.completions.create(
-            model="gemini-1.5-flash",
-            messages=messages,
-            tools=tools,  # type: ignore
-            tool_choice="auto",
-            temperature=0.0,
-        )
-        llm_response = raw_response.model_dump()
-        message = llm_response["choices"][0]["message"]
-        messages.append(message)
+        response = await llm_get_tools.ainvoke(messages)
+        messages.append(response)
 
-        if llm_response["choices"][0].get("finish_reason") != "tool_calls":
-            return {"status": "success", "answer": message.get("content")}
-        tool_calls = message.get("tool_calls", [])
+        if not response.tool_calls:
+            return {"status": "success", "answer": response.content}
 
-        task = []
-        for tool_call in tool_calls:
-            tool_name = tool_call["function"]["name"]
-            raw_args = json.loads(tool_call["function"]["arguments"])
-            task.append(process_agent_step(tool_name, raw_args))
-        results = await asyncio.gather(*task, return_exceptions=True)
-
-        for index, tool_call in enumerate(tool_calls):
-            result = results[index]
-            if isinstance(result, Exception):
-                content = f"error: {result}"
-            elif not isinstance(result, str):
-                content = json.dumps(result, ensure_ascii=False)
-            else:
-                content = result
-            messages.append(
-                {
-                    "role": "tool",
-                    "tool_call_id": tool_call["id"],
-                    "name": tool_call["function"]["name"],
-                    "content": content,
-                }
-            )
-    raise RuntimeError("System Error: Agent exeedec count of iterations.")
+        for tool_call in response.tool_calls:
+            tool_name = tool_call["name"]
+            selected_tool = tools_by_name[tool_name]
+            tool_output = await selected_tool.ainvoke(tool_call["args"])
+            tool_message = ToolMessage(content=str(tool_output), tool_call_id=tool_call["id"])
+            messages.append(tool_message)
+    raise RuntimeError("Limit is exceeded")
