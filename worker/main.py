@@ -4,6 +4,8 @@ from faststream import FastStream
 from faststream.kafka import KafkaBroker
 from pydantic import BaseModel, Field
 
+from .dispatcher import run_agentic_loop
+
 
 class GatewayRequest(BaseModel):
     task_id: UUID = Field(..., description="Unique task ideintifier")
@@ -33,6 +35,7 @@ async def publish_worker_response(response: WorkerResponse):
 
 @broker.subscriber("gateway-request")
 async def handle_gateway_request(msg: GatewayRequest):
-    mock_payload = WorkerResultPayload(answer=f"Response {msg.query}", sources=["test_doc"])
-    response = WorkerResponse(task_id=msg.task_id, status="COMPLETED", result=mock_payload)
+    loop_result = await run_agentic_loop(msg.query)
+    payload = WorkerResultPayload(answer=loop_result["answer"], sources=["test_doc"])
+    response = WorkerResponse(task_id=msg.task_id, status="COMPLETED", result=payload)
     await publish_worker_response(response)
