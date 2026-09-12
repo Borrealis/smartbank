@@ -1,0 +1,57 @@
+import asyncio
+import sys
+from pathlib import Path
+from uuid import uuid4
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from app.database import async_session, get_embedding
+from app.models import Document, DocumentChunk
+from langchain_text_splitters import MarkdownHeaderTextSplitter, RecursiveCharacterTextSplitter
+
+headers_to_split_on = [
+    ("#", "Header 1"),
+    ("##", "Header 2"),
+    ("###", "Header 3"),
+]
+marлdown_splitter = MarkdownHeaderTextSplitter(headers_to_split_on=headers_to_split_on)
+
+
+async def ingest_file(file_path: Path, doc_id: str, title: str, category: str):
+    with open(file_path, "r", encoding="utf-8") as f:
+        content = f.read()
+    md_header_splits = marлdown_splitter.split_text(content)
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=100)
+    final_splits = text_splitter.split_documents(md_header_splits)
+    async with async_session() as session:
+        doc = Document(id=doc_id, title=title, product_category=category, source_url=str(file_path))
+        session.add(doc)
+
+        for idx, chunk in enumerate(final_splits):
+            get_vector = get_embedding(chunk.page_content)
+            chunk_record = DocumentChunk(
+                id=str(uuid4()),
+                document_id=doc_id,
+                text_content=chunk.page_content,
+                embedding=get_vector,
+                chunk_index=idx,
+            )
+            session.add(chunk_record)
+        await session.commit()
+
+
+async def main():
+    docs_dir = Path("docs")
+    compliance_path = docs_dir / "compliance.md"
+    tariff_path = docs_dir / "tariff.md"
+
+    if compliance_path.exists():
+        await ingest_file(
+            compliance_path, "doc_compliance", "Методические рекомендации ЦБ", "Compliance"
+        )
+    if tariff_path.exists():
+        await ingest_file(tariff_path, "doc_tariff", "Условия банковского обслуживания", "Tariff")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
