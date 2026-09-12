@@ -18,7 +18,8 @@ services:
     image: pgvector/pgvector:pg15
     environment:
 
-      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_USER: ${POSTGRES_SERVER_DOCKER}
+      POSTGRES_PORT: ${POSTGRES_PORT_DOCKER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: smartbank
     ports:
