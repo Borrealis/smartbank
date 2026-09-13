@@ -1,7 +1,5 @@
-import json
-
 from app.database import async_session, get_embedding
-from app.models import Document, DocumentChunk
+from app.models import Client, Document, DocumentChunk
 from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 from sqlalchemy import select
@@ -17,22 +15,21 @@ class ComplianceSearchInput(BaseModel):
 
 
 @tool(args_schema=ClientTariffInput, description="Search and get tariff info in docs")
-def get_client_tariff_info(client_id: str) -> str:
-    mock_db = {
-        "client_123": {"tariff": "Premium", "status": "active"},
-        "client_S934": {"tariff": "Base", "status": "active"},
-        "client_ff94": {"tariff": "Diamond", "status": "blocked"},
-    }
-    client_data = mock_db.get(client_id, None)
-    if not client_data:
-        return json.dumps({"error": "Client not found", "client_id": client_id})
-    return json.dumps(client_data)
+async def get_client_tariff_info(client_id: str) -> dict:
+    async with async_session() as session:
+        stmt = select(Client).where(Client.id == client_id)
+        result = await session.execute(stmt)
+        client = result.scalar_one_or_none()
+
+    if client is None:
+        return {"error": "Client not found", "client_id": client_id}
+    return {"tariff": client.tariff_plan, "status": client.status}
 
 
 @tool(args_schema=ComplianceSearchInput, description="Search limitation and restriction in docs ")
 async def search_compliance_knowledge(
     search_query: str, product_category: str | None = None
-) -> str:
+) -> dict:
     query_vector = get_embedding(search_query)
     async with async_session() as session:
         stmt = (
@@ -47,13 +44,13 @@ async def search_compliance_knowledge(
         chunks_rows = result.all()
 
         if not chunks_rows:
-            return json.dumps({"result": []})
+            return {"result": []}
 
         parts = []
         for chunk, title in chunks_rows:
             parts.append({"source": title, "text": chunk.text_content})
 
-        return json.dumps({"result": parts}, ensure_ascii=False)
+        return {"result": parts}
 
     # filter_info = f" with category filter: '{product_category}'" if product_category else ""
     # return f"Found documents for query: '{search_query}'{filter_info}"

@@ -22,3 +22,10 @@ class DocumentChunk(Base):
     text_content: Mapped[str] = mapped_column(Text)
     embedding: Mapped[list[float]] = mapped_column(VECTOR(1536))
     chunk_index: Mapped[int] = mapped_column(Integer)
+
+
+class Client(Base):
+    __tablename__ = "clients"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    status: Mapped[str] = mapped_column(String)
+    tariff_plan: Mapped[str] = mapped_column(String)
