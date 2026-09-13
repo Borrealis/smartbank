@@ -36,7 +36,7 @@ async def search_compliance_knowledge(
             select(DocumentChunk, Document.title)
             .join(Document, DocumentChunk.document_id == Document.id)
             .order_by(DocumentChunk.embedding.cosine_distance(query_vector))
-            .limit(10)
+            .limit(3)
         )
         if product_category is not None:
             stmt = stmt.where(Document.product_category == product_category)

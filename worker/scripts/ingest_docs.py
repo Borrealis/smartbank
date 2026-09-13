@@ -3,6 +3,8 @@ import sys
 from pathlib import Path
 from uuid import uuid4
 
+from sqlalchemy import delete
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.database import async_session, get_embedding
@@ -24,6 +26,9 @@ async def ingest_file(file_path: Path, doc_id: str, title: str, category: str):
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=100)
     final_splits = text_splitter.split_documents(md_header_splits)
     async with async_session() as session:
+        await session.execute(delete(DocumentChunk).where(DocumentChunk.document_id == doc_id))
+        await session.execute(delete(Document).where(Document.id == doc_id))
+
         doc = Document(id=doc_id, title=title, product_category=category, source_url=str(file_path))
         session.add(doc)
 
