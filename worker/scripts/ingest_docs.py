@@ -16,13 +16,13 @@ headers_to_split_on = [
     ("##", "Header 2"),
     ("###", "Header 3"),
 ]
-marлdown_splitter = MarkdownHeaderTextSplitter(headers_to_split_on=headers_to_split_on)
+markdown_splitter = MarkdownHeaderTextSplitter(headers_to_split_on=headers_to_split_on)
 
 
 async def ingest_file(file_path: Path, doc_id: str, title: str, category: str):
     with open(file_path, "r", encoding="utf-8") as f:
         content = f.read()
-    md_header_splits = marлdown_splitter.split_text(content)
+    md_header_splits = markdown_splitter.split_text(content)
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=100)
     final_splits = text_splitter.split_documents(md_header_splits)
     async with async_session() as session:
