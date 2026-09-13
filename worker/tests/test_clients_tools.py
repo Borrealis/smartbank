@@ -1,7 +1,7 @@
 import pytest
 from app.tools import get_client_tariff_info
 
-pytestmark = pytest.mark.asyncio(loop_scope="module")
+pytestmark = pytest.mark.asyncio(loop_scope="session")
 
 
 async def test_get_client_tariff_info_returns_data_for_existing_client():
