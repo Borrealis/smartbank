@@ -22,8 +22,18 @@ async def get_client_tariff_info(client_id: str) -> dict:
         client = result.scalar_one_or_none()
 
     if client is None:
-        return {"error": "Client not found", "client_id": client_id}
-    return {"tariff": client.tariff_plan, "status": client.status}
+        return {
+            "client_id": client_id,
+            "tariff": None,
+            "status": None,
+            "error": "Client not found",
+        }
+    return {
+        "client_id": client.id,
+        "tariff": client.tariff_plan,
+        "status": client.status,
+        "error": None,
+    }
 
 
 @tool(args_schema=ComplianceSearchInput, description="Search limitation and restriction in docs ")
@@ -51,6 +61,3 @@ async def search_compliance_knowledge(
             parts.append({"source": title, "text": chunk.text_content})
 
         return {"result": parts}
-
-    # filter_info = f" with category filter: '{product_category}'" if product_category else ""
-    # return f"Found documents for query: '{search_query}'{filter_info}"
