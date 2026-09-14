@@ -1,44 +1,41 @@
-import json
-from dataclasses import dataclass
-from typing import Dict, Type
+import os
+from typing import Any, Dict
 
-from langchain_core.tools import BaseTool
-from pydantic import BaseModel, ValidationError
+from dotenv import load_dotenv
+from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
+from langchain_google_genai import ChatGoogleGenerativeAI
 
-from .schemas import ClientTariffInfo, SearchComplianceTool
 from .tools import get_client_tariff_info, search_compliance_knowledge
 
+load_dotenv()
 
-@dataclass(frozen=True)
-class ToolDefinition:
-    schema: Type[BaseModel]
-    handler: BaseTool
-
-
-TOOL_REGISTRY: Dict[str, ToolDefinition] = {
-    "get_client_tariff_info": ToolDefinition(
-        schema=ClientTariffInfo, handler=get_client_tariff_info
-    ),
-    "search_compliance_knowledge": ToolDefinition(
-        schema=SearchComplianceTool, handler=search_compliance_knowledge
-    ),
-}
+tools = [get_client_tariff_info, search_compliance_knowledge]
+tools_by_name = {tool.name: tool for tool in tools}
 
 
-async def process_agent_step(tool_name: str, raw_arguments: str):
-    tool = TOOL_REGISTRY.get(tool_name)
-    if not tool:
-        return f"system error: Tool'{tool_name}' not found"
+llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=os.getenv("GEMINI_API_KEY"))
+llm_get_tools = llm.bind_tools(tools)
 
-    try:
-        parsed_args = json.loads(raw_arguments) if isinstance(raw_arguments, str) else raw_arguments
-        validated_args = tool.schema.model_validate(parsed_args)
-        kwargs = validated_args.model_dump()
-        result = await tool.handler.ainvoke(**kwargs)
-        return json.dumps(result, ensure_ascii=False)
-    except json.JSONDecodeError:
-        return "System Error: Invalid JSON format provided by LLM."
-    except ValidationError as e:
-        return f"Validation Error in arguments: {e}"
-    except Exception as e:
-        return f"Execution Error: {e}"
+
+async def run_agentic_loop(user_query: str, max_iterations: int = 15) -> Dict[str, Any]:
+    messages: list = [
+        SystemMessage(content="You are AI assistant in bank"),
+        HumanMessage(content=user_query),
+    ]
+
+    for iteration in range(max_iterations):
+        response = await llm_get_tools.ainvoke(messages)
+        messages.append(response)
+
+        if not response.tool_calls:
+            return {"status": "success", "answer": response.content}
+
+        for tool_call in response.tool_calls:
+            tool_name = tool_call["name"]
+            selected_tool = tools_by_name.get(tool_name)
+            if selected_tool is None:
+                raise ValueError(f"Unknown tool:{tool_name}")
+            tool_output = await selected_tool.ainvoke(tool_call["args"])
+            tool_message = ToolMessage(content=str(tool_output), tool_call_id=tool_call["id"])
+            messages.append(tool_message)
+    raise RuntimeError("Limit is exceeded")

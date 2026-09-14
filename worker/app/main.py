@@ -4,7 +4,7 @@ from faststream import FastStream
 from faststream.kafka import KafkaBroker
 from pydantic import BaseModel, Field
 
-from .dispatcher import run_agentic_loop
+from .agentic_loop import run_agentic_loop
 
 
 class GatewayRequest(BaseModel):
