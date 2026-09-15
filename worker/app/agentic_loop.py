@@ -1,19 +1,16 @@
-import os
 from typing import Any, Dict
 
-from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 
-from .tools import get_client_tariff_info, search_compliance_knowledge
-
-load_dotenv()
+from app.config import settings
+from app.tools import get_client_tariff_info, search_compliance_knowledge
 
 tools = [get_client_tariff_info, search_compliance_knowledge]
 tools_by_name = {tool.name: tool for tool in tools}
 
 
-llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=os.getenv("GEMINI_API_KEY"))
+llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=settings.gemini_api_key)
 llm_get_tools = llm.bind_tools(tools)
 
 

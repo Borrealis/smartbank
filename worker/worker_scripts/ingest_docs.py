@@ -1,15 +1,12 @@
 import asyncio
-import sys
 from pathlib import Path
 from uuid import uuid4
 
-from sqlalchemy import delete
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from app.database import async_session, get_embedding
+from app.database import async_session
+from app.llm import get_embedding
 from app.models import Document, DocumentChunk
 from langchain_text_splitters import MarkdownHeaderTextSplitter, RecursiveCharacterTextSplitter
+from sqlalchemy import delete
 
 headers_to_split_on = [
     ("#", "Header 1"),
@@ -33,7 +30,7 @@ async def ingest_file(file_path: Path, doc_id: str, title: str, category: str):
         session.add(doc)
 
         for idx, chunk in enumerate(final_splits):
-            get_vector = get_embedding(chunk.page_content)
+            get_vector = await get_embedding(chunk.page_content)
             chunk_record = DocumentChunk(
                 id=str(uuid4()),
                 document_id=doc_id,
@@ -58,5 +55,10 @@ async def main():
         await ingest_file(tariff_path, "doc_tariff", "Условия банковского обслуживания", "Tariff")
 
 
-if __name__ == "__main__":
+def cli() -> None:
+    """Главная группа команд CLI."""
     asyncio.run(main())
+
+
+if __name__ == "__main__":
+    cli()

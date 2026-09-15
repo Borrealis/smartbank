@@ -1,8 +1,10 @@
-from app.database import async_session, get_embedding
-from app.models import Client, Document, DocumentChunk
 from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 from sqlalchemy import select
+
+from app.database import async_session
+from app.llm import get_embedding
+from app.models import Client, Document, DocumentChunk
 
 
 class ClientTariffInput(BaseModel):
@@ -40,7 +42,7 @@ async def get_client_tariff_info(client_id: str) -> dict:
 async def search_compliance_knowledge(
     search_query: str, product_category: str | None = None
 ) -> dict:
-    query_vector = get_embedding(search_query)
+    query_vector = await get_embedding(search_query)
     async with async_session() as session:
         stmt = (
             select(DocumentChunk, Document.title)

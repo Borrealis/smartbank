@@ -15,7 +15,8 @@ dependencies = [
     "sqlalchemy",
     "pgvector",
     "google-genai",
-    "tenacity"
+    "tenacity",
+    "greenlet>=3.5.5",
 ]
 
 [dependency-groups]
@@ -28,3 +29,15 @@ dev = [
 pythonpath = ["."]
 asyncio_default_test_loop_scope = "session"
 asyncio_default_fixture_loop_scope = "session"
+
+
+
+[project.scripts]
+ingest-docs = "worker_scripts.ingest_docs:cli"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*", "worker_scripts*"]

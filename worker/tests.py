@@ -1,12 +1,13 @@
 import asyncio
 
-from app.database import async_session, get_embedding
+from app.database import async_session
+from app.llm import get_embedding
 from app.models import DocumentChunk
 from sqlalchemy import select
 
 
 async def main():
-    query_vector = get_embedding(
+    query_vector = await get_embedding(
         "когда я могу перевести деньги если я пополнил их на свой счет сегодня"
     )
 
