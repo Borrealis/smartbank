@@ -1,4 +1,5 @@
-from openai import AsyncOpenAI
+from openai import AsyncOpenAI, RateLimitError
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_fixed
 
 from .config import settings
 
@@ -8,6 +9,12 @@ llm_client = AsyncOpenAI(
 )
 
 
+@retry(
+    retry=retry_if_exception_type(RateLimitError),
+    wait=wait_fixed(35),
+    stop=stop_after_attempt(3),
+    reraise=True,
+)
 async def get_embedding(text: str) -> list[float]:
     response = await llm_client.embeddings.create(
         model="gemini-embedding-001",
