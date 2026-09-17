@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .broker import publish_ask_request
+from .broker import gateway_request_publisher
 from .database import get_db
 from .models import TaskRecord
 from .schemas import AskRequest, AskResponse, TaskStatusResponse
@@ -16,14 +16,21 @@ router = APIRouter()
 async def ask_question(requests: AskRequest, db: AsyncSession = Depends(get_db)):
     task_id = requests.task_id
     new_task = TaskRecord(task_id=task_id, query=requests.query, status="PENDING")
+
     db.add(new_task)
     try:
-        await publish_ask_request(requests)
+        await db.commit()
+
     except Exception as e:
         await db.rollback()
-        raise HTTPException(
-            status_code=503, detail="Service temporaly not awailable now. Task not send in worker "
-        ) from e
+        raise HTTPException(status_code=503, detail="Task can not save to database ") from e
+    try:
+        await gateway_request_publisher.publish(requests)
+    except Exception as k_e:
+        new_task.status = "FAILED"
+        await db.commit()
+        raise HTTPException(status_code=503, detail="Failed send task to Kafka") from k_e
+
     return {"task_id": requests.task_id, "status": "PENDING"}
 
 

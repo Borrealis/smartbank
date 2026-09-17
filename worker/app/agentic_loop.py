@@ -1,16 +1,14 @@
 from typing import Any, Dict
 
 from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
-from langchain_google_genai import ChatGoogleGenerativeAI
 
-from app.config import settings
-from app.tools import get_client_tariff_info, search_compliance_knowledge
+from app.llm import llm
+
+from .tools import get_client_tariff_info, search_compliance_knowledge
 
 tools = [get_client_tariff_info, search_compliance_knowledge]
 tools_by_name = {tool.name: tool for tool in tools}
 
-
-llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=settings.gemini_api_key)
 llm_get_tools = llm.bind_tools(tools)
 
 
@@ -19,13 +17,13 @@ async def run_agentic_loop(user_query: str, max_iterations: int = 15) -> Dict[st
         SystemMessage(content="You are AI assistant in bank"),
         HumanMessage(content=user_query),
     ]
-
+    sources = []
     for iteration in range(max_iterations):
         response = await llm_get_tools.ainvoke(messages)
         messages.append(response)
 
         if not response.tool_calls:
-            return {"status": "success", "answer": response.content}
+            return {"status": "success", "answer": response.content, "sources": sources}
 
         for tool_call in response.tool_calls:
             tool_name = tool_call["name"]
@@ -33,6 +31,10 @@ async def run_agentic_loop(user_query: str, max_iterations: int = 15) -> Dict[st
             if selected_tool is None:
                 raise ValueError(f"Unknown tool:{tool_name}")
             tool_output = await selected_tool.ainvoke(tool_call["args"])
+            if tool_name == search_compliance_knowledge.name:
+                for chunk in tool_output["result"]:
+                    sources.append(chunk["source"])
+
             tool_message = ToolMessage(content=str(tool_output), tool_call_id=tool_call["id"])
             messages.append(tool_message)
     raise RuntimeError("Limit is exceeded")

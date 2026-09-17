@@ -12,13 +12,31 @@ services:
         condition: service_healthy
     env_file:
       - .env
+    environment:
+      POSTGRES_SERVER: db
+      POSTGRES_PORT: 5432
 
+
+  worker:
+
+    build:
+      context: .
+      dockerfile: worker/Dockerfile
+    depends_on:
+      - db
+      - kafka
+    environment:
+      POSTGRES_SERVER: db
+      POSTGRES_PORT: 5432
+      KAFKA_HOST: kafka:29092
+    env_file:
+      - .env
   # [02] Сервис базы данных PostgreSQL
   db:
     image: pgvector/pgvector:pg15
     environment:
 
-      POSTGRES_USER: ${POSTGRES_SERVER_DOCKER}
+      POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PORT: ${POSTGRES_PORT_DOCKER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: smartbank

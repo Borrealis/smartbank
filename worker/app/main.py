@@ -5,6 +5,7 @@ from faststream.kafka import KafkaBroker
 from pydantic import BaseModel, Field
 
 from .agentic_loop import run_agentic_loop
+from .config import settings
 
 
 class GatewayRequest(BaseModel):
@@ -24,18 +25,16 @@ class WorkerResponse(BaseModel):
     result: WorkerResultPayload | None = None
 
 
-broker = KafkaBroker("localhost:9092")
+broker = KafkaBroker(settings.kafka_host)
 app = FastStream(broker)
 
 
-@broker.publisher("worker-response")
-async def publish_worker_response(response: WorkerResponse):
-    return response
+worker_response_publisher = broker.publisher("worker-response")
 
 
 @broker.subscriber("gateway-request")
 async def handle_gateway_request(msg: GatewayRequest):
     loop_result = await run_agentic_loop(msg.query)
-    payload = WorkerResultPayload(answer=loop_result["answer"], sources=["test_doc"])
+    payload = WorkerResultPayload(answer=loop_result["answer"], sources=loop_result["sources"])
     response = WorkerResponse(task_id=msg.task_id, status="COMPLETED", result=payload)
-    await publish_worker_response(response)
+    await worker_response_publisher.publish(response)

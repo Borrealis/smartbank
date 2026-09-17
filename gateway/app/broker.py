@@ -7,16 +7,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .config import settings
 from .database import get_db
 from .models import TaskRecord
-from .schemas import AskRequest, TaskStatusResponse, WorkerResultPayload
+from .schemas import TaskStatusResponse, WorkerResultPayload
 
 kafka_router = KafkaRouter(settings.kafka_host)
 
 
-@kafka_router.publisher("gateway-request")
-async def publish_ask_request(msg: AskRequest) -> AskRequest:
-    """Публикация задачи в Kafka топик gateway-request."""
-    logger.info("Publishing task to Kafka: task_id={}", msg.task_id)
-    return msg
+gateway_request_publisher = kafka_router.publisher("gateway-request")
 
 
 @kafka_router.subscriber("worker-response")
