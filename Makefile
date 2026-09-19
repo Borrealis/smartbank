@@ -11,6 +11,8 @@ help:
 
 install:
 	uv sync
+	cd gateway && uv sync
+	cd worker && uv sync
 
 lint:
 	uv run ruff check .
@@ -19,10 +21,12 @@ format:
 	uv run ruff format .
 
 test:
-	uv run pytest -v
+	cd gateway && uv run pytest -v
+	cd worker && uv run pytest -v
 
 run:
-	uv run uvicorn app.main:app --reload
+	cd gateway && uv run uvicorn app.main:app --reload
+
 
 build:
 	docker compose build

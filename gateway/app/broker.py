@@ -36,3 +36,4 @@ async def get_task_info(msg: TaskStatusResponse, db: AsyncSession = Depends(get_
         logger.info("Task {} successfully updated in DB", msg.task_id)
     except Exception:
         logger.exception("Failed to process task update for task_id={}", msg.task_id)
+        raise
