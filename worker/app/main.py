@@ -1,3 +1,4 @@
+import logging
 from uuid import UUID
 
 from faststream import FastStream
@@ -6,6 +7,8 @@ from pydantic import BaseModel, Field
 
 from .agentic_loop import run_agentic_loop
 from .config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class GatewayRequest(BaseModel):
@@ -34,7 +37,16 @@ worker_response_publisher = broker.publisher("worker-response")
 
 @broker.subscriber("gateway-request")
 async def handle_gateway_request(msg: GatewayRequest):
-    loop_result = await run_agentic_loop(msg.query)
-    payload = WorkerResultPayload(answer=loop_result["answer"], sources=loop_result["sources"])
-    response = WorkerResponse(task_id=msg.task_id, status="COMPLETED", result=payload)
+    try:
+        loop_result = await run_agentic_loop(msg.query)
+        payload = WorkerResultPayload(answer=loop_result["answer"], sources=loop_result["sources"])
+        response = WorkerResponse(task_id=msg.task_id, status="COMPLETED", result=payload)
+    except Exception:
+        logger.exception("Worker failed while handling task_id=%s", msg.task_id)
+        response = WorkerResponse(
+            task_id=msg.task_id,
+            status="FAILED",
+            result=None,
+        )
+
     await worker_response_publisher.publish(response)
