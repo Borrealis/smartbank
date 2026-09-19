@@ -45,7 +45,7 @@ async def search_compliance_knowledge(
     query_vector = await get_embedding(search_query)
     async with async_session() as session:
         stmt = (
-            select(DocumentChunk, Document.title)
+            select(DocumentChunk, Document.title, Document.source_url)
             .join(Document, DocumentChunk.document_id == Document.id)
             .order_by(DocumentChunk.embedding.cosine_distance(query_vector))
             .limit(3)
@@ -59,7 +59,7 @@ async def search_compliance_knowledge(
             return {"result": []}
 
         parts = []
-        for chunk, title in chunks_rows:
-            parts.append({"source": title, "text": chunk.text_content})
+        for chunk, title, source_url in chunks_rows:
+            parts.append({"source": title, "text": chunk.text_content, "source_url": source_url})
 
         return {"result": parts}

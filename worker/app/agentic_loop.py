@@ -18,6 +18,7 @@ async def run_agentic_loop(user_query: str, max_iterations: int = 15) -> Dict[st
         HumanMessage(content=user_query),
     ]
     sources = []
+    seen_sources = set()
     for iteration in range(max_iterations):
         response = await llm_get_tools.ainvoke(messages)
         messages.append(response)
@@ -33,7 +34,10 @@ async def run_agentic_loop(user_query: str, max_iterations: int = 15) -> Dict[st
             tool_output = await selected_tool.ainvoke(tool_call["args"])
             if tool_name == search_compliance_knowledge.name:
                 for chunk in tool_output["result"]:
-                    sources.append(chunk["source"])
+                    source_url = chunk["source_url"]
+                    if source_url not in seen_sources:
+                        seen_sources.add(source_url)
+                        sources.append(source_url)
 
             tool_message = ToolMessage(content=str(tool_output), tool_call_id=tool_call["id"])
             messages.append(tool_message)
