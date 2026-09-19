@@ -9,9 +9,8 @@ Create Date: 2026-08-13 00:08:48.100438
 from collections.abc import Sequence
 
 import sqlalchemy as sa
-from pgvector.sqlalchemy import Vector
-
 from alembic import op
+from pgvector.sqlalchemy import Vector
 
 # [01] Идентификаторы ревизии (версии схемы миграции)
 revision: str = "7f3bd48a4ea0"
