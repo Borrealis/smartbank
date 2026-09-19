@@ -1,3 +1,4 @@
+import argparse
 import asyncio
 from pathlib import Path
 from uuid import uuid4
@@ -20,7 +21,7 @@ async def ingest_file(file_path: Path, doc_id: str, title: str, category: str):
     with open(file_path, "r", encoding="utf-8") as f:
         content = f.read()
     md_header_splits = markdown_splitter.split_text(content)
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=100)
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
     final_splits = text_splitter.split_documents(md_header_splits)
     async with async_session() as session:
         await session.execute(delete(DocumentChunk).where(DocumentChunk.document_id == doc_id))
@@ -42,22 +43,28 @@ async def ingest_file(file_path: Path, doc_id: str, title: str, category: str):
         await session.commit()
 
 
-async def main():
+async def main(documenct: str | None = None):
     docs_dir = Path("docs")
     compliance_path = docs_dir / "compliance.md"
     tariff_path = docs_dir / "tariff.md"
 
-    if compliance_path.exists():
+    if documenct in (None, "compliance") and compliance_path.exists():
         await ingest_file(
             compliance_path, "doc_compliance", "Методические рекомендации ЦБ", "Compliance"
         )
-    if tariff_path.exists():
+    if documenct in (None, "tariff") and tariff_path.exists():
         await ingest_file(tariff_path, "doc_tariff", "Условия банковского обслуживания", "Tariff")
 
 
 def cli() -> None:
-    """Главная группа команд CLI."""
-    asyncio.run(main())
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--document",
+        choices=["compliance", "tariff"],
+        default=None,
+    )
+    args = parser.parse_args()
+    asyncio.run(main(args.document))
 
 
 if __name__ == "__main__":
