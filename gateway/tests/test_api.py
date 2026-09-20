@@ -11,13 +11,6 @@ from httpx import ASGITransport, AsyncClient
 
 client = TestClient(app)
 
-completed_task = TaskRecord(
-    task_id=uuid4,
-    query="test query",
-    status="COMPLETED",
-    result={"answer": "test answer", "sources": ["docs/test.md"], "confidence": None},
-)
-
 
 @pytest.mark.asyncio
 async def test_ask_question_kafka(override_db, monkeypatch):
