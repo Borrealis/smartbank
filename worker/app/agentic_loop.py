@@ -33,7 +33,15 @@ async def run_agentic_loop(user_query: str, max_iterations: int = 15) -> Dict[st
         messages.append(response)
 
         if not response.tool_calls:
-            return {"status": "success", "answer": response.content, "sources": sources}
+            rscontent = response.content
+            if isinstance(rscontent, str):
+                answer = rscontent
+            else:
+                answer = "\n".join(
+                    block["text"] for block in rscontent if block.get("type") == "text"
+                )
+
+            return {"status": "success", "answer": answer, "sources": sources}
 
         for tool_call in response.tool_calls:
             tool_name = tool_call["name"]
