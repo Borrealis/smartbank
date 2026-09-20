@@ -14,7 +14,16 @@ llm_get_tools = llm.bind_tools(tools)
 
 async def run_agentic_loop(user_query: str, max_iterations: int = 15) -> Dict[str, Any]:
     messages: list = [
-        SystemMessage(content="You are AI assistant in bank"),
+        SystemMessage(
+            content=(
+                "You are an AI banking assistant. Use internal tools to search the document "
+                "database for bank rules before answering questions that require factual policy "
+                "information. When a query includes a client ID and the answer depends on the "
+                "client's tariff or status, call get_client_tariff_info. Base your answer only on "
+                "results returned by tools; do not invent facts. If the available tools do not "
+                "provide enough information, say so clearly. Answer in Russian."
+            )
+        ),
         HumanMessage(content=user_query),
     ]
     sources = []

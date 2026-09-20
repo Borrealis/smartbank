@@ -1,13 +1,14 @@
-.PHONY: help install lint format test run build clean
+.PHONY: help install lint format test run ingest build clean
 
 help:
 	@echo "install - sync dependencies"
 	@echo "lint - ruff check"
 	@echo "format - ruff format"
 	@echo "test - run pytest"
-	@echo "run - start uvicorn locally"
+	@echo "run - start all services with Docker Compose"
 	@echo "build - docker compose build"
 	@echo "clean - remove caches"
+	@echo "ingest - load documents into pgvector"
 
 install:
 	uv sync
@@ -25,8 +26,9 @@ test:
 	cd worker && uv run pytest -v
 
 run:
-	cd gateway && uv run uvicorn app.main:app --reload
-
+	docker compose up
+ingest:
+	PYTHONPATH=worker uv run --project worker python -m worker_scripts.ingest_docs
 
 build:
 	docker compose build
