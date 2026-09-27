@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .broker import gateway_request_publisher
 from .database import get_db
 from .models import TaskRecord
-from .schemas import AskRequest, AskResponse, TaskStatusResponse
+from .schemas import AskRequest, AskResponse, GatewayStatus, TaskStatusResponse
 
 router = APIRouter()
 
@@ -15,7 +15,7 @@ router = APIRouter()
 @router.post("/ask", response_model=AskResponse)
 async def ask_question(requests: AskRequest, db: AsyncSession = Depends(get_db)):
     task_id = requests.task_id
-    new_task = TaskRecord(task_id=task_id, query=requests.query, status="PENDING")
+    new_task = TaskRecord(task_id=task_id, query=requests.query, status=GatewayStatus.PROCESSING)
 
     db.add(new_task)
     try:
@@ -27,11 +27,11 @@ async def ask_question(requests: AskRequest, db: AsyncSession = Depends(get_db))
     try:
         await gateway_request_publisher.publish(requests)
     except Exception as k_e:
-        new_task.status = "FAILED"
+        new_task.status = GatewayStatus.FAILED
         await db.commit()
         raise HTTPException(status_code=503, detail="Failed send task to Kafka") from k_e
 
-    return {"task_id": requests.task_id, "status": "PENDING"}
+    return {"task_id": requests.task_id, "status": GatewayStatus.PROCESSING}
 
 
 @router.get("/status/{task_id}", response_model=TaskStatusResponse)

@@ -1,3 +1,4 @@
+from enum import StrEnum
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -9,9 +10,15 @@ class AskRequest(BaseModel):
     query: str = Field(min_length=1, max_length=1000, description="Query text")
 
 
+class GatewayStatus(StrEnum):
+    PROCESSING = "PROCESSING"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+
+
 class AskResponse(BaseModel):
     task_id: UUID = Field(..., description="Unique task identifier")
-    status: str = Field(..., description="Current task status")
+    status: GatewayStatus = Field(..., description="Current task status")
 
 
 class WorkerResultPayload(BaseModel):
@@ -24,7 +31,7 @@ class WorkerResultPayload(BaseModel):
 
 class TaskStatusResponse(BaseModel):
     task_id: UUID = Field(..., description="Unique task identifier")
-    status: str = Field(..., description="Current task status")
+    status: GatewayStatus = Field(..., description="Current task status")
     model_config = ConfigDict(from_attributes=True)
     result: WorkerResultPayload | dict[str, Any] | None = Field(
         default=None, description="Structured task result"

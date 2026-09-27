@@ -4,8 +4,11 @@ from typing import Any
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import JSON, DateTime, ForeignKey, String, Text, func
+from sqlalchemy import Enum as SqlEnum
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+from .schemas import GatewayStatus
 
 
 class Base(DeclarativeBase):
@@ -18,7 +21,10 @@ class TaskRecord(Base):
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     query: Mapped[str] = mapped_column(String)
-    status: Mapped[str] = mapped_column(String)
+    status: Mapped[GatewayStatus] = mapped_column(
+        SqlEnum(GatewayStatus, name="task_status"),
+        nullable=False,
+    )
     result: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
