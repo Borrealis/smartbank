@@ -11,6 +11,7 @@ dependencies = [
     "langchain-text-splitters>=1.1.2",
     "langchain",
     "langchain-openai",
+    "loguru>=0.7.3",
     "asyncpg>=0.31.0",
     "pydantic-settings",
     "sqlalchemy",
