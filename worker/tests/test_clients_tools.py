@@ -12,19 +12,15 @@ async def test_get_client_tariff_info_returns_data_for_existing_client():
         session.add(client_66)
         await session.commit()
     result = await get_client_tariff_info.ainvoke({"client_id": "client_66"})
-    assert result == {
-        "client_id": "client_66",
-        "tariff": "Premium",
-        "status": "active",
-        "error": None,
-    }
+    assert result.client_id == "client_66"
+    assert result.tariff == "Premium"
+    assert result.status == "active"
+    assert result.error is None
 
 
 async def test_get_client_tariff_info_returns_data_for_missing_client():
     fail_result = await get_client_tariff_info.ainvoke({"client_id": "client_99"})
-    assert fail_result == {
-        "client_id": "client_99",
-        "tariff": None,
-        "status": None,
-        "error": "Client not found",
-    }
+    assert fail_result.client_id == "client_99"
+    assert fail_result.tariff is None
+    assert fail_result.status is None
+    assert fail_result.error == "Client not found"

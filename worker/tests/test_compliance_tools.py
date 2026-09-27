@@ -49,5 +49,5 @@ async def test_search_compliance_knowledge_query_search(monkeypatch: pytest.Monk
         }
     )
 
-    assert result["result"]
-    assert all(chunk["source"] == "Методические рекомендации ЦБ" for chunk in result["result"])
+    assert result.result
+    assert all(chunk.source == "Методические рекомендации ЦБ" for chunk in result.result)

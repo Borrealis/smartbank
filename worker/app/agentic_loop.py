@@ -38,7 +38,9 @@ async def run_agentic_loop(user_query: str, max_iterations: int = 15) -> Dict[st
                 answer = rscontent
             else:
                 answer = "\n".join(
-                    block["text"] for block in rscontent if block.get("type") == "text"
+                    block["text"]
+                    for block in rscontent
+                    if isinstance(block, dict) and block.get("type") == "text"
                 )
 
             return {"status": "success", "answer": answer, "sources": sources}
@@ -49,13 +51,14 @@ async def run_agentic_loop(user_query: str, max_iterations: int = 15) -> Dict[st
             if selected_tool is None:
                 raise ValueError(f"Unknown tool:{tool_name}")
             tool_output = await selected_tool.ainvoke(tool_call["args"])
+            tool_output_dict = tool_output.model_dump()
             if tool_name == search_compliance_knowledge.name:
-                for chunk in tool_output["result"]:
+                for chunk in tool_output_dict["result"]:
                     source_url = chunk["source_url"]
                     if source_url not in seen_sources:
                         seen_sources.add(source_url)
                         sources.append(source_url)
 
-            tool_message = ToolMessage(content=str(tool_output), tool_call_id=tool_call["id"])
+            tool_message = ToolMessage(content=str(tool_output_dict), tool_call_id=tool_call["id"])
             messages.append(tool_message)
     raise RuntimeError("Limit is exceeded")
